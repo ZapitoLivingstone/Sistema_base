@@ -75,6 +75,9 @@ export default function Navbar() {
                     Iniciar Sesión
                   </Button>
                 </Link>
+                <Link href="/auth/register">
+                  <Button size="sm">Registrarse</Button>
+                </Link>
               </div>
             )}
           </div>
@@ -128,12 +131,19 @@ export default function Navbar() {
                   </Button>
                 </div>
               ) : (
-                <Link href="/auth/login" className="block px-3 py-2" onClick={() => setIsMenuOpen(false)}>
-                  <Button variant="outline" size="sm">
-                    <User className="h-4 w-4 mr-2" />
-                    Iniciar Sesión
-                  </Button>
-                </Link>
+                <div className="px-3 py-2 space-y-2">
+                  <Link href="/auth/login" className="block" onClick={() => setIsMenuOpen(false)}>
+                    <Button variant="outline" size="sm" className="w-full bg-transparent">
+                      <User className="h-4 w-4 mr-2" />
+                      Iniciar Sesión
+                    </Button>
+                  </Link>
+                  <Link href="/auth/register" className="block" onClick={() => setIsMenuOpen(false)}>
+                    <Button size="sm" className="w-full">
+                      Registrarse
+                    </Button>
+                  </Link>
+                </div>
               )}
             </div>
           </div>
