@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { signIn } from "@/lib/auth"
 import { Eye, EyeOff, LogIn } from "lucide-react"
+import { getCurrentUser } from "@/lib/auth"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -32,7 +33,25 @@ export default function LoginPage() {
       if (error) {
         setError(error.message)
       } else {
-        router.push("/")
+        // Obtener el usuario y redirigir según su rol
+        const userData = await getCurrentUser()
+        if (userData) {
+          switch (userData.rol) {
+            case "admin":
+              router.push("/admin/dashboard")
+              break
+            case "trabajador":
+              router.push("/trabajador/dashboard")
+              break
+            case "cliente":
+              router.push("/cliente/dashboard")
+              break
+            default:
+              router.push("/")
+          }
+        } else {
+          router.push("/")
+        }
         router.refresh()
       }
     } catch (err) {

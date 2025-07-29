@@ -117,7 +117,7 @@ export default function RegisterPage() {
       const userData = {
         nombre: formData.nombre.trim(),
         rol: formData.rol,
-        sucursal_id: formData.sucursal_id ? Number.parseInt(formData.sucursal_id) : undefined,
+        sucursal_id: formData.sucursal_id ? Number.parseInt(formData.sucursal_id) : null,
       }
 
       const { error } = await signUp(formData.email, formData.password, userData)

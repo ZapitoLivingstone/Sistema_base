@@ -26,6 +26,20 @@ export default function Navbar() {
     await signOut()
     setUser(null)
     router.push("/")
+    router.refresh()
+  }
+
+  const redirectByRole = (userRole: string) => {
+    switch (userRole) {
+      case "admin":
+        return "/admin/dashboard"
+      case "trabajador":
+        return "/trabajador/dashboard"
+      case "cliente":
+        return "/cliente/dashboard"
+      default:
+        return "/"
+    }
   }
 
   return (

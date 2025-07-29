@@ -72,3 +72,11 @@ export async function checkEmailExists(email: string) {
 
   return { exists: !!data, error }
 }
+
+// Agregar función para refrescar el estado del usuario
+export async function refreshUserSession() {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+  return session
+}
