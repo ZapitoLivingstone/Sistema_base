@@ -11,21 +11,38 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { ShoppingCart, Plus, Minus, Trash2, Clock, CreditCard } from "lucide-react"
+import { ShoppingCart, Plus, Minus, Trash2, Clock, CreditCard, Search, Package } from "lucide-react"
+import Image from "next/image"
+
+interface ProductoConStock extends Producto {
+  stock_disponible: number
+}
 
 export default function POSPage() {
   const [user, setUser] = useState<User | null>(null)
-  const [productos, setProductos] = useState<Producto[]>([])
+  const [productos, setProductos] = useState<ProductoConStock[]>([])
+  const [productosFiltrados, setProductosFiltrados] = useState<ProductoConStock[]>([])
   const [cart, setCart] = useState<CartItem[]>([])
   const [turnoActivo, setTurnoActivo] = useState<Turno | null>(null)
   const [efectivoInicial, setEfectivoInicial] = useState("")
   const [metodoPago, setMetodoPago] = useState<"efectivo" | "tarjeta" | "transferencia" | "webpay" | "otro">("efectivo")
+  const [searchTerm, setSearchTerm] = useState("")
   const [loading, setLoading] = useState(true)
   const [processingPayment, setProcessingPayment] = useState(false)
 
   useEffect(() => {
     loadData()
   }, [])
+
+  useEffect(() => {
+    // Filtrar productos por búsqueda
+    const filtered = productos.filter(
+      (producto) =>
+        producto.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        producto.descripcion?.toLowerCase().includes(searchTerm.toLowerCase()),
+    )
+    setProductosFiltrados(filtered)
+  }, [searchTerm, productos])
 
   const loadData = async () => {
     try {
@@ -57,23 +74,34 @@ export default function POSPage() {
   }
 
   const loadProductos = async (sucursalId: number) => {
-    const { data, error } = await supabase
-      .from("productos")
-      .select(`
-        *,
-        categoria:categorias(nombre),
-        medios:medios_producto(*),
-        stock:stock_sucursal!inner(stock)
-      `)
-      .eq("stock.sucursal_id", sucursalId)
-      .gt("stock.stock", 0)
+    try {
+      const { data, error } = await supabase
+        .from("productos")
+        .select(`
+          *,
+          categoria:categorias(nombre),
+          medios:medios_producto(*),
+          stock:stock_sucursal!inner(stock)
+        `)
+        .eq("stock.sucursal_id", sucursalId)
+        .gt("stock.stock", 0)
 
-    if (error) {
+      if (error) {
+        console.error("Error loading products:", error)
+        return
+      }
+
+      // Transformar datos para incluir stock disponible
+      const productosConStock: ProductoConStock[] = (data || []).map((producto) => ({
+        ...producto,
+        stock_disponible: producto.stock?.[0]?.stock || 0,
+      }))
+
+      setProductos(productosConStock)
+      setProductosFiltrados(productosConStock)
+    } catch (error) {
       console.error("Error loading products:", error)
-      return
     }
-
-    setProductos(data || [])
   }
 
   const iniciarTurno = async () => {
@@ -99,6 +127,7 @@ export default function POSPage() {
       setEfectivoInicial("")
     } catch (error) {
       console.error("Error starting shift:", error)
+      alert("Error al iniciar turno")
     }
   }
 
@@ -129,14 +158,23 @@ export default function POSPage() {
 
       setTurnoActivo(null)
       setProductos([])
+      setProductosFiltrados([])
       setCart([])
     } catch (error) {
       console.error("Error ending shift:", error)
+      alert("Error al finalizar turno")
     }
   }
 
-  const addToCart = (producto: Producto) => {
+  const addToCart = (producto: ProductoConStock) => {
     const existingItem = cart.find((item) => item.producto.id === producto.id)
+    const cantidadEnCarrito = existingItem ? existingItem.cantidad : 0
+
+    // Verificar stock disponible
+    if (cantidadEnCarrito >= producto.stock_disponible) {
+      alert(`Stock insuficiente. Solo hay ${producto.stock_disponible} unidades disponibles.`)
+      return
+    }
 
     if (existingItem) {
       setCart(cart.map((item) => (item.producto.id === producto.id ? { ...item, cantidad: item.cantidad + 1 } : item)))
@@ -148,9 +186,17 @@ export default function POSPage() {
   const updateQuantity = (productId: number, newQuantity: number) => {
     if (newQuantity <= 0) {
       setCart(cart.filter((item) => item.producto.id !== productId))
-    } else {
-      setCart(cart.map((item) => (item.producto.id === productId ? { ...item, cantidad: newQuantity } : item)))
+      return
     }
+
+    // Verificar stock disponible
+    const producto = productos.find((p) => p.id === productId)
+    if (producto && newQuantity > producto.stock_disponible) {
+      alert(`Stock insuficiente. Solo hay ${producto.stock_disponible} unidades disponibles.`)
+      return
+    }
+
+    setCart(cart.map((item) => (item.producto.id === productId ? { ...item, cantidad: newQuantity } : item)))
   }
 
   const getTotal = () => {
@@ -163,6 +209,20 @@ export default function POSPage() {
     setProcessingPayment(true)
 
     try {
+      // Verificar stock antes de procesar
+      for (const item of cart) {
+        const { data: stockData } = await supabase
+          .from("stock_sucursal")
+          .select("stock")
+          .eq("producto_id", item.producto.id)
+          .eq("sucursal_id", user.sucursal_id!)
+          .single()
+
+        if (!stockData || stockData.stock < item.cantidad) {
+          throw new Error(`Stock insuficiente para ${item.producto.nombre}`)
+        }
+      }
+
       // Crear venta
       const { data: venta, error: ventaError } = await supabase
         .from("ventas")
@@ -193,13 +253,11 @@ export default function POSPage() {
 
       // Actualizar stock
       for (const item of cart) {
-        const { error: stockError } = await supabase
-          .from("stock_sucursal")
-          .update({
-            stock: item.producto.stock![0].stock - item.cantidad,
-          })
-          .eq("producto_id", item.producto.id)
-          .eq("sucursal_id", user.sucursal_id!)
+        const { error: stockError } = await supabase.rpc("actualizar_stock", {
+          p_producto_id: item.producto.id,
+          p_sucursal_id: user.sucursal_id!,
+          p_cantidad: -item.cantidad,
+        })
 
         if (stockError) throw stockError
       }
@@ -208,10 +266,10 @@ export default function POSPage() {
       setCart([])
       await loadProductos(user.sucursal_id!)
 
-      alert("Venta procesada exitosamente")
-    } catch (error) {
+      alert(`Venta procesada exitosamente. Total: $${getTotal().toFixed(2)}`)
+    } catch (error: any) {
       console.error("Error processing sale:", error)
-      alert("Error al procesar la venta")
+      alert(`Error al procesar la venta: ${error.message}`)
     } finally {
       setProcessingPayment(false)
     }
@@ -241,6 +299,7 @@ export default function POSPage() {
         <Card className="w-full max-w-md">
           <CardHeader>
             <CardTitle className="text-center">Iniciar Turno</CardTitle>
+            <p className="text-center text-sm text-gray-600">Sucursal: {user.sucursal?.nombre || "No asignada"}</p>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
@@ -271,7 +330,10 @@ export default function POSPage() {
         <div className="flex justify-between items-center mb-6">
           <div>
             <h1 className="text-2xl font-bold">Punto de Venta</h1>
-            <p className="text-gray-600">Turno iniciado: {new Date(turnoActivo.fecha_inicio).toLocaleString()}</p>
+            <p className="text-gray-600">
+              Sucursal: {user.sucursal?.nombre} | Turno iniciado: {new Date(turnoActivo.fecha_inicio).toLocaleString()}
+            </p>
+            <p className="text-sm text-gray-500">Efectivo inicial: ${turnoActivo.efectivo_inicial.toFixed(2)}</p>
           </div>
           <Button onClick={finalizarTurno} variant="outline">
             Finalizar Turno
@@ -283,22 +345,68 @@ export default function POSPage() {
           <div className="lg:col-span-2">
             <Card>
               <CardHeader>
-                <CardTitle>Productos Disponibles</CardTitle>
+                <CardTitle className="flex items-center justify-between">
+                  <span>Productos Disponibles ({productosFiltrados.length})</span>
+                  <div className="relative w-64">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                    <Input
+                      placeholder="Buscar productos..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                  {productos.map((producto) => (
-                    <div
-                      key={producto.id}
-                      className="border rounded-lg p-4 cursor-pointer hover:shadow-md transition-shadow"
-                      onClick={() => addToCart(producto)}
-                    >
-                      <h3 className="font-medium mb-2">{producto.nombre}</h3>
-                      <p className="text-lg font-bold text-blue-600 mb-2">${producto.precio.toFixed(2)}</p>
-                      <Badge variant="secondary">Stock: {producto.stock?.[0]?.stock || 0}</Badge>
-                    </div>
-                  ))}
-                </div>
+                {productosFiltrados.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-500">
+                      {searchTerm ? "No se encontraron productos" : "No hay productos con stock en esta sucursal"}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 max-h-96 overflow-y-auto">
+                    {productosFiltrados.map((producto) => (
+                      <div
+                        key={producto.id}
+                        className="border rounded-lg p-4 cursor-pointer hover:shadow-md transition-shadow bg-white"
+                        onClick={() => addToCart(producto)}
+                      >
+                        <div className="relative h-24 w-full mb-3">
+                          {producto.medios && producto.medios.length > 0 ? (
+                            <Image
+                              src={producto.medios[0].url || "/placeholder.svg"}
+                              alt={producto.nombre}
+                              fill
+                              className="object-cover rounded"
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-gray-200 rounded flex items-center justify-center">
+                              <Package className="h-8 w-8 text-gray-400" />
+                            </div>
+                          )}
+                        </div>
+                        <h3 className="font-medium mb-2 text-sm line-clamp-2">{producto.nombre}</h3>
+                        <p className="text-lg font-bold text-blue-600 mb-2">${producto.precio.toFixed(2)}</p>
+                        <div className="flex justify-between items-center">
+                          <Badge
+                            variant={producto.stock_disponible > 10 ? "secondary" : "destructive"}
+                            className="text-xs"
+                          >
+                            Stock: {producto.stock_disponible}
+                          </Badge>
+                          {producto.categoria && (
+                            <Badge variant="outline" className="text-xs">
+                              {producto.categoria.nombre}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -317,8 +425,11 @@ export default function POSPage() {
                   {cart.map((item) => (
                     <div key={item.producto.id} className="flex items-center justify-between border-b pb-2">
                       <div className="flex-1">
-                        <h4 className="font-medium">{item.producto.nombre}</h4>
+                        <h4 className="font-medium text-sm">{item.producto.nombre}</h4>
                         <p className="text-sm text-gray-600">${item.producto.precio.toFixed(2)} c/u</p>
+                        <p className="text-xs text-gray-500">
+                          Stock disponible: {(item.producto as ProductoConStock).stock_disponible}
+                        </p>
                       </div>
                       <div className="flex items-center space-x-2">
                         <Button
@@ -328,7 +439,7 @@ export default function POSPage() {
                         >
                           <Minus className="h-3 w-3" />
                         </Button>
-                        <span className="w-8 text-center">{item.cantidad}</span>
+                        <span className="w-8 text-center text-sm">{item.cantidad}</span>
                         <Button
                           size="sm"
                           variant="outline"

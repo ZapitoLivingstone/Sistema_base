@@ -6,6 +6,7 @@ export interface User {
   sucursal_id?: number
   created_at: string
   updated_at?: string
+  sucursal?: Sucursal
 }
 
 export interface Producto {
@@ -38,6 +39,7 @@ export interface MedioProducto {
   producto_id: number
   tipo: "foto" | "video"
   url: string
+  path?: string // Agregar path para facilitar eliminación
 }
 
 export interface StockSucursal {
