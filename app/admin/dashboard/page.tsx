@@ -3,12 +3,15 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { supabase } from "@/lib/supabase"
-import type { User } from "@/lib/types"
+import type { User, Venta } from "@/lib/types"
 import AuthGuard from "@/components/auth-guard"
+import { PageHeader } from "@/components/common/page-header"
+import { StatsCard } from "@/components/common/stats-card"
+import { QuickActionCard } from "@/components/common/quick-action-card"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Users, Package, ShoppingCart, DollarSign, TrendingUp, Settings } from "lucide-react"
+import { LoadingSpinner } from "@/components/ui/loading-spinner"
+import { Users, Package, ShoppingCart, DollarSign, TrendingUp, Store, BarChart3, Heart } from "lucide-react"
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({
@@ -17,7 +20,7 @@ export default function AdminDashboard() {
     totalSales: 0,
     totalRevenue: 0,
     recentUsers: [] as User[],
-    recentSales: [] as any[],
+    recentSales: [] as Venta[],
   })
   const [loading, setLoading] = useState(true)
 
@@ -51,14 +54,10 @@ export default function AdminDashboard() {
         .order("created_at", { ascending: false })
         .limit(5)
 
-      // Ventas recientes con detalles
+      // Ventas recientes
       const { data: recentSales } = await supabase
         .from("ventas")
-        .select(`
-          *,
-          trabajador:users!ventas_trabajador_id_fkey(nombre),
-          sucursal:sucursales(nombre)
-        `)
+        .select("*")
         .eq("anulada", false)
         .order("fecha", { ascending: false })
         .limit(5)
@@ -81,7 +80,7 @@ export default function AdminDashboard() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-600"></div>
+        <LoadingSpinner size="lg" />
       </div>
     )
   }
@@ -90,108 +89,115 @@ export default function AdminDashboard() {
     <AuthGuard allowedRoles={["admin"]}>
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">Panel de Administración</h1>
-            <p className="text-gray-600">Control total del sistema</p>
-          </div>
-
-          {/* Quick Actions */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <Link href="/admin/usuarios">
-              <Button className="w-full h-20 flex flex-col items-center justify-center">
-                <Users className="h-6 w-6 mb-2" />
-                Gestionar Usuarios
-              </Button>
-            </Link>
-            <Link href="/admin/productos">
-              <Button
-                className="w-full h-20 flex flex-col items-center justify-center bg-transparent"
-                variant="outline"
-              >
-                <Package className="h-6 w-6 mb-2" />
-                Gestionar Productos
-              </Button>
-            </Link>
-            <Link href="/admin/ventas">
-              <Button
-                className="w-full h-20 flex flex-col items-center justify-center bg-transparent"
-                variant="outline"
-              >
-                <ShoppingCart className="h-6 w-6 mb-2" />
-                Ver Ventas
-              </Button>
-            </Link>
-            <Link href="/admin/categorias">
-              <Button
-                className="w-full h-20 flex flex-col items-center justify-center bg-transparent"
-                variant="outline"
-              >
-                <Settings className="h-6 w-6 mb-2" />
-                Categorías
-              </Button>
-            </Link>
-          </div>
+          {/* Header */}
+          <PageHeader
+            title="Panel de Administración"
+            description="Gestiona todo el sistema desde aquí"
+            showBackButton={false}
+          />
 
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Usuarios</CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.totalUsers}</div>
-                <p className="text-xs text-muted-foreground">Usuarios registrados</p>
-              </CardContent>
-            </Card>
+            <StatsCard
+              title="Total Usuarios"
+              value={stats.totalUsers.toString()}
+              description="Usuarios registrados"
+              icon={Users}
+              trend={{ value: 12, isPositive: true }}
+            />
+            <StatsCard
+              title="Total Productos"
+              value={stats.totalProducts.toString()}
+              description="Productos en catálogo"
+              icon={Package}
+              trend={{ value: 8, isPositive: true }}
+            />
+            <StatsCard
+              title="Total Ventas"
+              value={stats.totalSales.toString()}
+              description="Ventas realizadas"
+              icon={ShoppingCart}
+              trend={{ value: 15, isPositive: true }}
+            />
+            <StatsCard
+              title="Ingresos Totales"
+              value={`$${stats.totalRevenue.toLocaleString()}`}
+              description="Revenue total"
+              icon={DollarSign}
+              trend={{ value: 23, isPositive: true }}
+            />
+          </div>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Productos</CardTitle>
-                <Package className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.totalProducts}</div>
-                <p className="text-xs text-muted-foreground">Productos en catálogo</p>
-              </CardContent>
-            </Card>
+          {/* Quick Actions */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <QuickActionCard
+              title="Gestionar Usuarios"
+              description="Ver, crear y editar usuarios"
+              icon={Users}
+              href="/admin/usuarios"
+              color="blue"
+            />
+            <QuickActionCard
+              title="Gestionar Productos"
+              description="Administrar catálogo de productos"
+              icon={Package}
+              href="/admin/productos"
+              color="green"
+            />
+            <QuickActionCard
+              title="Ver Ventas"
+              description="Historial y reportes de ventas"
+              icon={BarChart3}
+              href="/admin/ventas"
+              color="purple"
+            />
+            <QuickActionCard
+              title="Gestionar Sucursales"
+              description="Administrar sucursales y stock"
+              icon={Store}
+              href="/admin/sucursales"
+              color="orange"
+            />
+          </div>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Ventas</CardTitle>
-                <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.totalSales}</div>
-                <p className="text-xs text-muted-foreground">Ventas realizadas</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Ingresos Totales</CardTitle>
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">${stats.totalRevenue.toFixed(2)}</div>
-                <p className="text-xs text-muted-foreground">Revenue total</p>
-              </CardContent>
-            </Card>
+          {/* Acciones Adicionales para Admin */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <QuickActionCard
+              title="Mi Lista de Deseos"
+              description="Ver productos guardados"
+              icon={Heart}
+              href="/cliente/wishlist"
+              color="pink"
+            />
+            <QuickActionCard
+              title="Mi Carrito"
+              description="Ver productos en carrito"
+              icon={ShoppingCart}
+              href="/cliente/carrito"
+              color="indigo"
+            />
+            <QuickActionCard
+              title="Gestionar Stock"
+              description="Control de inventario"
+              icon={Package}
+              href="/admin/stock"
+              color="teal"
+            />
           </div>
 
           <div className="grid lg:grid-cols-2 gap-6">
             {/* Usuarios Recientes */}
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="flex items-center">
-                  <Users className="h-5 w-5 mr-2" />
-                  Usuarios Recientes
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span className="flex items-center">
+                    <Users className="h-5 w-5 mr-2" />
+                    Usuarios Recientes
+                  </span>
+                  <Link href="/admin/usuarios" className="text-sm text-blue-600 hover:underline">
+                    Ver todos
+                  </Link>
                 </CardTitle>
-                <Link href="/admin/usuarios">
-                  <Button size="sm" variant="outline">
-                    Ver Todos
-                  </Button>
-                </Link>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
@@ -213,22 +219,25 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                   ))}
+                  {stats.recentUsers.length === 0 && (
+                    <p className="text-gray-500 text-center py-4">No hay usuarios recientes</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
 
             {/* Ventas Recientes */}
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="flex items-center">
-                  <TrendingUp className="h-5 w-5 mr-2" />
-                  Ventas Recientes
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span className="flex items-center">
+                    <TrendingUp className="h-5 w-5 mr-2" />
+                    Ventas Recientes
+                  </span>
+                  <Link href="/admin/ventas" className="text-sm text-blue-600 hover:underline">
+                    Ver todas
+                  </Link>
                 </CardTitle>
-                <Link href="/admin/ventas">
-                  <Button size="sm" variant="outline">
-                    Ver Todas
-                  </Button>
-                </Link>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
@@ -236,12 +245,7 @@ export default function AdminDashboard() {
                     <div key={venta.id} className="flex items-center justify-between border-b pb-2">
                       <div>
                         <p className="font-medium">Venta #{venta.id}</p>
-                        <p className="text-sm text-gray-600">
-                          {venta.sucursal?.nombre} - {venta.tipo_venta}
-                        </p>
-                        <p className="text-xs text-gray-500 capitalize">
-                          {venta.metodo_pago} {venta.trabajador && `• ${venta.trabajador.nombre}`}
-                        </p>
+                        <p className="text-sm text-gray-600 capitalize">{venta.metodo_pago}</p>
                       </div>
                       <div className="text-right">
                         <p className="font-bold text-green-600">${venta.monto_total.toFixed(2)}</p>
@@ -249,6 +253,9 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                   ))}
+                  {stats.recentSales.length === 0 && (
+                    <p className="text-gray-500 text-center py-4">No hay ventas recientes</p>
+                  )}
                 </div>
               </CardContent>
             </Card>

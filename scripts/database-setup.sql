@@ -22,12 +22,12 @@ create table users (
   updated_at timestamptz
 );
 
--- PRODUCTOS
+-- PRODUCTOS (precio en enteros para CLP)
 create table productos (
   id bigint primary key generated always as identity,
   nombre text not null,
   descripcion text,
-  precio numeric(10, 2) not null,
+  precio integer not null, -- Cambiado a integer para CLP
   categoria_id bigint references categorias (id),
   destacado boolean default false,
   created_at timestamptz default now(),
@@ -51,12 +51,12 @@ create table medios_producto (
   url text not null
 );
 
--- VENTAS
+-- VENTAS (monto en enteros para CLP)
 create table ventas (
   id bigint primary key generated always as identity,
   trabajador_id bigint references users (id),
   sucursal_id bigint references sucursales (id),
-  monto_total numeric(10, 2) not null,
+  monto_total integer not null, -- Cambiado a integer para CLP
   metodo_pago text check (metodo_pago in ('efectivo', 'tarjeta', 'transferencia', 'webpay', 'otro')) not null,
   tipo_venta text check (tipo_venta in ('fisica', 'online')) not null default 'fisica',
   anulada boolean default false,
@@ -88,13 +88,13 @@ create table detalles_venta_pedido (
   )
 );
 
--- TURNOS DE CAJA (POS)
+-- TURNOS DE CAJA (POS) - efectivo en enteros para CLP
 create table turnos (
   id bigint primary key generated always as identity,
   trabajador_id bigint references users (id),
   sucursal_id bigint references sucursales (id),
-  efectivo_inicial numeric(10, 2) not null,
-  efectivo_final numeric(10, 2),
+  efectivo_inicial integer not null, -- Cambiado a integer para CLP
+  efectivo_final integer, -- Cambiado a integer para CLP
   fecha_inicio timestamptz default now(),
   fecha_fin timestamptz
 );
@@ -105,3 +105,5 @@ create index idx_productos_categoria on productos (categoria_id);
 create index idx_stock_sucursal on stock_sucursal (producto_id, sucursal_id);
 create index idx_ventas_fecha on ventas (fecha);
 create index idx_pedidos_estado_fecha on pedidos (estado, fecha_creacion);
+create index idx_turnos_trabajador on turnos (trabajador_id);
+create index idx_turnos_activos on turnos (trabajador_id, fecha_fin) where fecha_fin is null;

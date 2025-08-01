@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Users, Edit, Trash2, Search, ArrowLeft } from "lucide-react"
+import { Users, Edit, Trash2, Search, ArrowLeft, Plus } from "lucide-react"
 import Link from "next/link"
 
 export default function AdminUsuarios() {
@@ -136,17 +136,25 @@ export default function AdminUsuarios() {
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mb-8">
-            <div className="flex items-center mb-4">
-              <Link href="/admin/dashboard">
-                <Button variant="outline" size="sm" className="mr-4 bg-transparent">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Volver
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center">
+                <Link href="/admin/dashboard">
+                  <Button variant="outline" size="sm" className="mr-4 bg-transparent">
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Volver
+                  </Button>
+                </Link>
+                <div>
+                  <h1 className="text-3xl font-bold text-gray-900">Gestión de Usuarios</h1>
+                  <p className="text-gray-600">Administra todos los usuarios del sistema</p>
+                </div>
+              </div>
+              <Link href="/admin/crear-usuario">
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Crear Usuario
                 </Button>
               </Link>
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">Gestión de Usuarios</h1>
-                <p className="text-gray-600">Administra todos los usuarios del sistema</p>
-              </div>
             </div>
 
             {/* Filtros */}

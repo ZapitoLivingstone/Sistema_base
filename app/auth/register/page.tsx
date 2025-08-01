@@ -2,18 +2,15 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { signUp, checkEmailExists } from "@/lib/auth"
-import { supabase } from "@/lib/supabase"
-import type { Sucursal } from "@/lib/types"
 import { Eye, EyeOff, UserPlus, CheckCircle } from "lucide-react"
 
 export default function RegisterPage() {
@@ -22,10 +19,7 @@ export default function RegisterPage() {
     email: "",
     password: "",
     confirmPassword: "",
-    rol: "cliente" as "admin" | "cliente" | "trabajador",
-    sucursal_id: "",
   })
-  const [sucursales, setSucursales] = useState<Sucursal[]>([])
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -33,21 +27,6 @@ export default function RegisterPage() {
   const [success, setSuccess] = useState(false)
   const [emailError, setEmailError] = useState("")
   const router = useRouter()
-
-  useEffect(() => {
-    loadSucursales()
-  }, [])
-
-  const loadSucursales = async () => {
-    const { data, error } = await supabase.from("sucursales").select("*").order("nombre")
-
-    if (error) {
-      console.error("Error loading sucursales:", error)
-      return
-    }
-
-    setSucursales(data || [])
-  }
 
   const validateForm = () => {
     if (!formData.nombre.trim()) {
@@ -72,11 +51,6 @@ export default function RegisterPage() {
 
     if (formData.password !== formData.confirmPassword) {
       setError("Las contraseñas no coinciden")
-      return false
-    }
-
-    if (formData.rol === "trabajador" && !formData.sucursal_id) {
-      setError("Los trabajadores deben tener una sucursal asignada")
       return false
     }
 
@@ -116,8 +90,8 @@ export default function RegisterPage() {
     try {
       const userData = {
         nombre: formData.nombre.trim(),
-        rol: formData.rol,
-        sucursal_id: formData.sucursal_id ? Number.parseInt(formData.sucursal_id) : null,
+        rol: "cliente" as const, // Siempre cliente por defecto
+        sucursal_id: null,
       }
 
       const { error } = await signUp(formData.email, formData.password, userData)
@@ -163,7 +137,7 @@ export default function RegisterPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold">Crear Cuenta</CardTitle>
-          <CardDescription>Completa los datos para registrarte</CardDescription>
+          <CardDescription>Regístrate como cliente</CardDescription>
         </CardHeader>
 
         <CardContent>
@@ -199,41 +173,6 @@ export default function RegisterPage() {
               />
               {emailError && <p className="text-sm text-red-500">{emailError}</p>}
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="rol">Tipo de Usuario</Label>
-              <Select value={formData.rol} onValueChange={(value: any) => setFormData({ ...formData, rol: value })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cliente">Cliente</SelectItem>
-                  <SelectItem value="trabajador">Trabajador</SelectItem>
-                  <SelectItem value="admin">Administrador</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {formData.rol === "trabajador" && (
-              <div className="space-y-2">
-                <Label htmlFor="sucursal">Sucursal</Label>
-                <Select
-                  value={formData.sucursal_id}
-                  onValueChange={(value) => setFormData({ ...formData, sucursal_id: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecciona una sucursal" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {sucursales.map((sucursal) => (
-                      <SelectItem key={sucursal.id} value={sucursal.id.toString()}>
-                        {sucursal.nombre}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
 
             <div className="space-y-2">
               <Label htmlFor="password">Contraseña</Label>
@@ -304,19 +243,16 @@ export default function RegisterPage() {
             </p>
           </div>
 
-          {/* Información sobre roles */}
+          {/* Información sobre el registro */}
           <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-            <h4 className="text-sm font-medium text-blue-800 mb-2">Tipos de usuario:</h4>
+            <h4 className="text-sm font-medium text-blue-800 mb-2">Información:</h4>
             <div className="text-xs text-blue-700 space-y-1">
               <p>
-                <strong>Cliente:</strong> Puede realizar compras online
+                • Te registras como <strong>Cliente</strong>
               </p>
-              <p>
-                <strong>Trabajador:</strong> Acceso al POS + compras (requiere sucursal)
-              </p>
-              <p>
-                <strong>Admin:</strong> Control total del sistema
-              </p>
+              <p>• Podrás realizar compras online</p>
+              <p>• Acceso a carrito y lista de deseos</p>
+              <p>• Para otros roles, contacta al administrador</p>
             </div>
           </div>
         </CardContent>
